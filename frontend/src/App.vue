@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import AppLayout from './components/AppLayout.vue'
 import { useAuthStore } from '@/stores/counter'
@@ -8,7 +9,9 @@ const authStore = useAuthStore()
 
 // Routes that don't need the layout (login, register)
 const noLayoutRoutes = ['login', 'register']
-const showLayout = !noLayoutRoutes.includes(route.name as string) && authStore.isAuthenticated
+const showLayout = computed(() => 
+  !noLayoutRoutes.includes(route.name as string) && authStore.isAuthenticated
+)
 </script>
 
 <template>
