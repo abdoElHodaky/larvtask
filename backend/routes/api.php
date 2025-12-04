@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CartController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\OrderController;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +34,13 @@ Route::group(['prefix' => 'auth'], function () {
 Route::middleware('auth:api')->group(function () {
     // Products routes
     Route::apiResource('products', ProductController::class);
+    
+    // Cart routes
+    Route::get('cart', [CartController::class, 'index']);
+    Route::post('cart', [CartController::class, 'store']);
+    Route::put('cart/{cartItem}', [CartController::class, 'update']);
+    Route::delete('cart/{cartItem}', [CartController::class, 'destroy']);
+    Route::delete('cart', [CartController::class, 'clear']);
     
     // Orders routes
     Route::post('orders', [OrderController::class, 'store']);

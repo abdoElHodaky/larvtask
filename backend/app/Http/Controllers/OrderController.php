@@ -51,11 +51,12 @@ class OrderController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
             'address' => 'required|string|max:500',
             'phone' => 'required|string|max:20',
+            'use_cart' => 'boolean',
+            'items' => 'required_if:use_cart,false|array|min:1',
+            'items.*.product_id' => 'required_if:use_cart,false|exists:products,id',
+            'items.*.quantity' => 'required_if:use_cart,false|integer|min:1',
         ]);
 
         if ($validator->fails()) {
@@ -68,13 +69,44 @@ class OrderController extends Controller
 
         try {
             return DB::transaction(function () use ($request) {
-                $items = $request->get('items');
+                $user = auth()->user();
+                $useCart = $request->get('use_cart', true);
+                
+                if ($useCart) {
+                    // Use cart items
+                    $cartItems = $user->cartItems()->with('product')->get();
+                    
+                    if ($cartItems->isEmpty()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Cart is empty'
+                        ], 422);
+                    }
+                    
+                    $items = $cartItems->map(function ($cartItem) {
+                        return [
+                            'product_id' => $cartItem->product_id,
+                            'quantity' => $cartItem->quantity,
+                            'product' => $cartItem->product
+                        ];
+                    });
+                } else {
+                    // Use provided items (legacy support)
+                    $items = collect($request->get('items'))->map(function ($item) {
+                        return [
+                            'product_id' => $item['product_id'],
+                            'quantity' => $item['quantity'],
+                            'product' => Product::find($item['product_id'])
+                        ];
+                    });
+                }
+
                 $total = 0;
                 $orderItems = [];
 
                 // Validate stock and calculate total
                 foreach ($items as $item) {
-                    $product = Product::find($item['product_id']);
+                    $product = $item['product'];
                     
                     if (!$product->isAvailable()) {
                         return response()->json([
@@ -102,7 +134,7 @@ class OrderController extends Controller
 
                 // Create order
                 $order = Order::create([
-                    'user_id' => auth()->id(),
+                    'user_id' => $user->id,
                     'order_number' => Order::generateOrderNumber(),
                     'total' => $total,
                     'address' => $request->get('address'),
@@ -117,6 +149,11 @@ class OrderController extends Controller
                     // Decrease product stock
                     $product = Product::find($orderItem['product_id']);
                     $product->decrement('stock', $orderItem['quantity']);
+                }
+
+                // Clear cart if using cart items
+                if ($useCart) {
+                    $user->cartItems()->delete();
                 }
 
                 // Load relationships for response

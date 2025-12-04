@@ -142,6 +142,16 @@
             </div>
             <div class="flex items-center space-x-2">
               <button
+                @click="addToCart(product)"
+                :disabled="!product.is_active || product.stock <= 0 || cartStore.loading"
+                class="inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg class="-ml-1 mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.5 6M7 13l-1.5-6m0 0h15.5M7 13h10m0 0v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6z" />
+                </svg>
+                Add to Cart
+              </button>
+              <button
                 @click="editProduct(product)"
                 class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
@@ -238,12 +248,14 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { productsAPI, type Product, type PaginatedResponse } from '@/services/api'
+import { useCartStore } from '@/stores/cart'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import ProductFormModal from '@/components/ProductFormModal.vue'
 import DeleteConfirmModal from '@/components/DeleteConfirmModal.vue'
 
 // State
+const cartStore = useCartStore()
 const products = ref<Product[]>([])
 const loading = ref(false)
 const pagination = ref<PaginatedResponse<Product>['pagination'] | null>(null)
@@ -337,6 +349,21 @@ const clearAlert = () => {
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString()
+}
+
+const addToCart = async (product: Product) => {
+  try {
+    const result = await cartStore.addToCart(product.id, 1)
+    
+    if (result.success) {
+      showAlert('success', result.message)
+    } else {
+      showAlert('error', result.message)
+    }
+  } catch (error) {
+    console.error('Error adding to cart:', error)
+    showAlert('error', 'Failed to add item to cart')
+  }
 }
 
 // Watchers
